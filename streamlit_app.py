@@ -1,40 +1,67 @@
-import altair as alt
-import numpy as np
-import pandas as pd
+## Integrate our code OpenAI API
+import os
+# from constants import openai_key
+from langchain.llms import OpenAI
+from langchain import PromptTemplate
+from langchain.chains import LLMChain
+
+from langchain.memory import ConversationBufferMemory
+
+from langchain.chains import SequentialChain
+
 import streamlit as st
 
-"""
-# Welcome to Streamlit!
+os.environ["OPENAI_API_KEY"]="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"
 
-Edit `/streamlit_app.py` to customize this app to your heart's desire :heart:.
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
+# streamlit framework
 
-In the meantime, below is an example of what you can do with just a few lines of code:
-"""
+st.title('Celebrity Search Results')
+input_text=st.text_input("Search the topic u want")
 
-num_points = st.slider("Number of points in spiral", 1, 10000, 1100)
-num_turns = st.slider("Number of turns in spiral", 1, 300, 31)
+# Prompt Templates
 
-indices = np.linspace(0, 1, num_points)
-theta = 2 * np.pi * num_turns * indices
-radius = indices
+first_input_prompt=PromptTemplate(
+    input_variables=['name'],
+    template="Tell me about celebrity {name}"
+)
 
-x = radius * np.cos(theta)
-y = radius * np.sin(theta)
+# Memory
 
-df = pd.DataFrame({
-    "x": x,
-    "y": y,
-    "idx": indices,
-    "rand": np.random.randn(num_points),
-})
+person_memory = ConversationBufferMemory(input_key='name', memory_key='chat_history')
+dob_memory = ConversationBufferMemory(input_key='person', memory_key='chat_history')
+descr_memory = ConversationBufferMemory(input_key='dob', memory_key='description_history')
 
-st.altair_chart(alt.Chart(df, height=700, width=700)
-    .mark_point(filled=True)
-    .encode(
-        x=alt.X("x", axis=None),
-        y=alt.Y("y", axis=None),
-        color=alt.Color("idx", legend=None, scale=alt.Scale()),
-        size=alt.Size("rand", legend=None, scale=alt.Scale(range=[1, 150])),
-    ))
+## OPENAI LLMS
+llm=OpenAI(temperature=0.8)
+chain=LLMChain(
+    llm=llm,prompt=first_input_prompt,verbose=True,output_key='person',memory=person_memory)
+
+# Prompt Templates
+
+second_input_prompt=PromptTemplate(
+    input_variables=['person'],
+    template="when was {person} born"
+)
+
+chain2=LLMChain(
+    llm=llm,prompt=second_input_prompt,verbose=True,output_key='dob',memory=dob_memory)
+# Prompt Templates
+
+third_input_prompt=PromptTemplate(
+    input_variables=['dob'],
+    template="Mention 5 major events happened around {dob} in the world"
+)
+chain3=LLMChain(llm=llm,prompt=third_input_prompt,verbose=True,output_key='description',memory=descr_memory)
+parent_chain=SequentialChain(
+    chains=[chain,chain2,chain3],input_variables=['name'],output_variables=['person','dob','description'],verbose=True)
+
+
+
+if input_text:
+    st.write(parent_chain({'name':input_text}))
+
+    with st.expander('Person Name'): 
+        st.info(person_memory.buffer)
+
+    with st.expander('Major Events'): 
+        st.info(descr_memory.buffer)
