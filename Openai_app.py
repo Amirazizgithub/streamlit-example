@@ -11,7 +11,7 @@ from langchain.chains import SequentialChain
 
 import streamlit as st
 
-os.environ["OPENAI_API_KEY"]="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"
+os.environ["OPENAI_API_KEY"]="sk-twr................................."
 
 # streamlit framework
 
